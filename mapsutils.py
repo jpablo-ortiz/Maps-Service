@@ -152,7 +152,39 @@ class OpenService(MapService):
             res = self.geolocator.geocode(ubicacion)
 
         if res is None:
-            raise ValueError('No se encontró la ubicación')
+            # Si no hay respuesta intentar con los servicios de BingMaps
+
+            # Se agrega la clave de la API Bing Maps
+            kwargs.update({'key': self._api_key})
+
+            url = self._url_localizacion
+
+            # Si se ingresa una longitud y latitud.
+            if type(ubicacion) is tuple or type(ubicacion) is list:
+                # Ejemplo de llamada:
+                # http://dev.virtualearth.net/REST/v1/Locations?query=Bogot%C3%A1%2C+Colombia%2C+Carrear+111c+%2381-30&key=AiHmbkSxeJrOk9uYeGh6Rue2DCZeAe3Ozk2zwmct5b-GvXxvqpbP-UqAWqqQb47J
+
+                url += '?'
+
+                # Se agregan en los parámetros el query de la búsqueda
+                kwargs.update({'query': ubicacion})
+
+            elif type(ubicacion) is str:
+                # Ejemplo de llamada:
+                # https://dev.virtualearth.net/REST/v1/Locations/4.695128,-74.086825?&key=AiHmbkSxeJrOk9uYeGh6Rue2DCZeAe3Ozk2zwmct5b-GvXxvqpbP-UqAWqqQb47J
+
+                # Se agrega el valor obligatorio a enviar
+                url += '/' + urllib.parse.quote(ubicacion) + '?'
+
+            # Se agrega a la consulta todos los parámetros kwargs
+            url += urlencode(kwargs)
+
+            # Se hace la consulta al servicio REST
+            data = _json_from_url(url)
+
+            # Se devuelve el resultado de la consulta en formato JSON (MAP)
+            return data['resourceSets'][0]['resources'][0]
+            
         else:
             proc = '{"point": {"coordinates": [' + str(res.latitude) + ', ' + str(
                 res.longitude) + ']}, "address": {"formattedAddress": "' + res.address + '"} }'
@@ -619,6 +651,7 @@ class Localizacion(object):
                     self._direccion = direccion
                     self._direccion_recibida = True
                 else:
+                    print(type(direccion))
                     raise ValueError('La dirección debe ser un String')
             else:
                 raise ValueError(
@@ -737,7 +770,7 @@ class Ruta(object):
         Raises:
             ValueError: Si hay alguna verificación fallida.
         """
-        self._translator = Translator()
+
         self._data_procesada = False
         self._imagen_procesada = False
         self._paradas = None
@@ -907,6 +940,7 @@ class Ruta(object):
             texto = item["instruction"]["text"]
             # Si se quieren traducir las indicaciones, se hace la traducción a español
             if traducir:
+                self._translator = Translator()
                 texto = self._translator.translate(
                     item["instruction"]["text"], src='en', dest='es').text
             indicaciones.append(texto)
